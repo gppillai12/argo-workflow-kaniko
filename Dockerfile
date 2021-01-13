@@ -1,4 +1,7 @@
-FROM busybox:latest
-MAINTAINER GP Pillai (fastergp@gmail.com)
-CMD ["date"]
+FROM ubuntu 
+MAINTAINER testg@gmail.com 
+
+RUN apt-get update 
+RUN apt-get install –y nginx 
+CMD [“echo”,”Image created”] 
 
