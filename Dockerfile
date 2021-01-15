@@ -1,6 +1,2 @@
-FROM ubuntu 
-MAINTAINER testg@gmail.com 
-
-RUN apt-get update 
-CMD [“echo”,”Image created”] 
-
+FROM docker/whalesay
+MAINTAINER testg@gmail.com
