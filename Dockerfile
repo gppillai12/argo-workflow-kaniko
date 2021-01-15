@@ -1,2 +1,2 @@
-FROM docker/whalesay
+FROM busybox
 MAINTAINER testg@gmail.com
