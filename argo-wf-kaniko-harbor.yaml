@@ -1,0 +1,74 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Workflow
+metadata:
+  generateName: argo-workflow-build-
+  namespace: argo
+spec:
+  entrypoint: workflow
+  arguments:
+    parameters:
+    - name: version
+      value: v1
+    - name: github-user
+      value: gppillai12
+    - name: github-revision
+      value: main
+    - name: docker-org
+      value: demo.goharbor.io
+    - name: build-push-image
+      value: true
+  volumes:
+  - name: docker-config
+    secret:
+      secretName: harbor-registry-secret
+    # projected:
+    #   sources:
+    #   - secret:
+    #       name: regcred
+    #       items:
+    #       - key: .dockerconfigjson
+    #         path: config.json     
+  volumeClaimTemplates:
+  - metadata:
+      name: workspace
+    spec:
+      accessModes: [ "ReadWriteOnce" ]
+      resources:
+        requests:
+          storage: 0.5Gi
+  templates:
+  - name: workflow
+    steps:
+    - - name: get-source
+        template: get-source-code
+    - - name: build-push
+        template: build-and-push
+        when: "{{workflow.parameters.build-push-image}} == true"
+    #- - name: train
+    #    template: tfjob
+  - name: get-source-code
+    inputs:
+      artifacts:
+      - name: git-repo
+        path: /argo-workflow-kaniko
+        git:
+          repo: https://github.com/{{workflow.parameters.github-user}}/argo-workflow-kaniko.git
+          revision: "{{workflow.parameters.github-revision}}"
+    container:
+      image: alpine:latest
+      command: [sh, -c]
+      args: ["cp /argo-workflow-kaniko/* /workspace/; ls /workspace"]
+      volumeMounts:
+      - name: workspace
+        mountPath: /workspace
+  - name: build-and-push
+    container:
+      image: gcr.io/kaniko-project/executor:debug-v0.18.0
+      args: ["--dockerfile","Dockerfile","--destination","{{workflow.parameters.docker-org}}/gpharbor/yalaimage1"]
+      workingDir: /argo-workflow-kaniko
+      volumeMounts:
+      - name: docker-config
+        mountPath: "/root/.docker/config.json"
+        subPath: ".dockerconfigjson"
+      - name: workspace
+        mountPath: /workspace

@@ -1,0 +1,86 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Workflow
+metadata:
+  generateName: argo-workflow-build-
+  namespace: argo
+spec:
+  entrypoint: workflow
+  arguments:
+    parameters:
+    - name: version
+      value: v1
+    - name: github-user
+      value: gppillai12
+    - name: github-revision
+      value: main
+    - name: docker-org
+      value: docker.io
+    - name: build-push-image
+      value: true
+    - name: image-name-backend
+      value: gpdocker9/yalabuild1
+  volumes:
+  - name: docker-config
+    secret:
+      secretName: docker-registry-secret
+  volumeClaimTemplates:
+  - metadata:
+      name: workspace
+    spec:
+      accessModes: [ "ReadWriteOnce" ]
+      resources:
+        requests:
+          storage: 0.5Gi
+  templates:
+  - name: workflow
+    steps:
+    - - name: get-source
+        template: get-source-code
+    - - name: build-push
+        template: build-and-push
+        when: "{{workflow.parameters.build-push-image}} == true"
+    #- - name: train
+    #    template: tfjob
+  - name: get-source-code
+    inputs:
+      artifacts:
+      - name: git-repo
+        path: /argo-workflow-kaniko
+        git:
+          repo: https://github.com/{{workflow.parameters.github-user}}/argo-workflow-kaniko.git
+          revision: "{{workflow.parameters.github-revision}}"
+    container:
+      image: alpine:latest
+      command: [sh, -c]
+      args: ["cp /argo-workflow-kaniko/* /workspace/; ls /workspace"]
+      volumeMounts:
+      - name: workspace
+        mountPath: /workspace
+  - name: build-and-push
+    container:
+      image: docker:18.09
+      command: [sh, -c]
+      args: ["cat /root/.docker/config.json && until docker ps; do sleep 1; done; cd /workspace && docker build . -t {{workflow.parameters.docker-org}}/{{workflow.parameters.image-name-backend}} && docker push {{workflow.parameters.docker-org}}/{{workflow.parameters.image-name-backend}}"]
+      workingDir: /workspace
+      env:
+      - name: DOCKER_HOST
+        value: 127.0.0.1
+      volumeMounts:
+      - name: docker-config
+        mountPath: "/root/.docker/config.json"
+        subPath: ".dockerconfigjson"
+      - name: workspace
+        mountPath: /workspace
+    sidecars:
+    - name: docker-in-docker
+      image: docker:18.09-dind
+      resources: 
+        requests:
+          cpu: 100m
+          memory: 100Mi
+        limits: 
+          cpu: 400m
+          memory: 800Mi
+      securityContext:
+        privileged: true
+      mirrorVolumeMounts: true
