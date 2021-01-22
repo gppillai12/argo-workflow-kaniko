@@ -1,0 +1,1 @@
+docker run -v $(pwd):/usr gcr.io/kaniko-project/executor:latest --dockerfile=Dockerfile --context=/usr --destination=index.docker.io/gpdocker9/busybox:v1
